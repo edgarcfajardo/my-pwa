@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
-import { saveTask } from '../db/indexedDB';
+import { saveTask, type Task } from '../db/indexedDB';
 
 interface TaskFormProps {
   onTaskSaved: () => void;
 }
 
-interface TaskData {
-  title: string;
-  description: string;
-}
+type TaskData = Pick<Task, 'title' | 'description'>;
 
 const TaskForm: React.FC<TaskFormProps> = ({ onTaskSaved }) => {
   const [task, setTask] = useState<TaskData>({ title: '', description: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -21,14 +20,17 @@ const TaskForm: React.FC<TaskFormProps> = ({ onTaskSaved }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!task.title.trim()) return;
-
-    await saveTask({
-      ...task,
-      timestamp: Date.now(),
-    });
-
-    setTask({ title: '', description: '' });
-    onTaskSaved();
+    setSaving(true);
+    setError(null);
+    try {
+      await saveTask({ ...task, timestamp: Date.now() });
+      setTask({ title: '', description: '' });
+      onTaskSaved();
+    } catch (err) {
+      setError('No se pudo guardar la tarea. Intenta de nuevo.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -49,14 +51,15 @@ const TaskForm: React.FC<TaskFormProps> = ({ onTaskSaved }) => {
         onChange={handleChange}
         style={textareaStyle}
       />
-      <button type="submit" style={buttonStyle}>
-        Guardar tarea
+      {error && <span style={errorStyle}>{error}</span>}
+      <button type="submit" style={buttonStyle} disabled={saving}>
+        {saving ? 'Guardando…' : 'Guardar tarea'}
       </button>
     </form>
   );
 };
 
-// Estilos básicos en línea (puedes usar CSS o Tailwind si prefieres)
+// Estilos en línea
 const formStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
@@ -84,6 +87,11 @@ const buttonStyle: React.CSSProperties = {
   color: 'white',
   border: 'none',
   cursor: 'pointer',
+};
+
+const errorStyle: React.CSSProperties = {
+  color: '#d32f2f',
+  fontSize: '14px',
 };
 
 export default TaskForm;

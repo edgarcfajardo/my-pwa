@@ -1,51 +1,38 @@
-import { openDB } from 'idb';
-import * as idb from 'idb';
+import { openDB, type IDBPDatabase } from 'idb';
 
-type DBSchema = idb.DBSchema;
-
-
-interface Task {
+export interface Task {
   id?: number;
   title: string;
   description: string;
   timestamp: number;
 }
 
-interface MyDB extends DBSchema {
-  tasks: {
-    key: number;
-    value: Task;
-    indexes: { 'by-timestamp': number };
-  };
+const DB_NAME = 'tasks-db';
+const STORE_NAME = 'tasks';
+const DB_VERSION = 1;
+
+export async function getDB(): Promise<IDBPDatabase> {
+  return await openDB(DB_NAME, DB_VERSION, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+      }
+    },
+  });
 }
 
-export const dbPromise = openDB<MyDB>('tasks-db', 2, {
-  upgrade(db) {
-    if (!db.objectStoreNames.contains('tasks')) {
-      const store = db.createObjectStore('tasks', {
-        keyPath: 'id',
-        autoIncrement: true,
-      });
-      store.createIndex('by-timestamp', 'timestamp');
-    }
-  },
-});
+export async function saveTask(task: Omit<Task, 'id'>): Promise<number> {
+  const db = await getDB();
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  const key = await tx.store.add(task);
+  await tx.done;
+  // idb returns the generated key as number for autoIncrement stores
+  return key as number;
+}
 
-export const saveTask = async (task: Task) => {
-  try {
-    const db = await dbPromise;
-    await db.add('tasks', task);
-  } catch (error) {
-    console.error('Error al guardar la tarea:', error);
-  }
-};
-
-export const getAllTasks = async (): Promise<Task[]> => {
-  try {
-    const db = await dbPromise;
-    return await db.getAll('tasks');
-  } catch (error) {
-    console.error('Error al obtener las tareas:', error);
-    return [];
-  }
-};
+export async function getTasks(): Promise<Task[]> {
+  const db = await getDB();
+  const tasks = (await db.getAll(STORE_NAME)) as Task[];
+  // Sort newest first for better UX
+  return tasks.sort((a, b) => b.timestamp - a.timestamp);
+}
