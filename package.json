@@ -13,6 +13,7 @@
   "dependencies": {
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
+    "idb": "^8.0.3",
     "lint-staged": "^16.1.6",
     "prettier": "^3.6.2",
     "react": "^19.1.1",
